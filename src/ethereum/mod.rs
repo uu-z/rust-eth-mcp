@@ -290,3 +290,155 @@ impl ServerHandler for EthTrader {
         Ok(self.get_info())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::str::FromStr;
+
+    #[test]
+    fn test_eth_trader_creation() {
+        let trader = EthTrader::new();
+        assert!(trader.rpc_url.len() > 0);
+    }
+
+    #[test]
+    fn test_default_quote() {
+        assert_eq!(default_quote(), "USD");
+    }
+
+    #[test]
+    fn test_default_slippage() {
+        assert_eq!(default_slippage(), "0.5");
+    }
+
+    #[test]
+    fn test_get_balance_args_deserialization() {
+        let json = r#"{"address": "0x742d35Cc6634C0532925a3b844Bc454e4438f44e"}"#;
+        let args: GetBalanceArgs = serde_json::from_str(json).unwrap();
+        assert_eq!(args.address, "0x742d35Cc6634C0532925a3b844Bc454e4438f44e");
+        assert!(args.token.is_none());
+    }
+
+    #[test]
+    fn test_get_balance_args_with_token() {
+        let json = r#"{"address": "0x742d35Cc6634C0532925a3b844Bc454e4438f44e", "token": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"}"#;
+        let args: GetBalanceArgs = serde_json::from_str(json).unwrap();
+        assert_eq!(args.address, "0x742d35Cc6634C0532925a3b844Bc454e4438f44e");
+        assert_eq!(args.token.unwrap(), "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48");
+    }
+
+    #[test]
+    fn test_get_token_price_args_deserialization() {
+        let json = r#"{"token": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"}"#;
+        let args: GetTokenPriceArgs = serde_json::from_str(json).unwrap();
+        assert_eq!(args.token, "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48");
+        assert_eq!(args.quote, "USD");
+    }
+
+    #[test]
+    fn test_get_token_price_args_with_quote() {
+        let json = r#"{"token": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48", "quote": "ETH"}"#;
+        let args: GetTokenPriceArgs = serde_json::from_str(json).unwrap();
+        assert_eq!(args.quote, "ETH");
+    }
+
+    #[test]
+    fn test_swap_tokens_args_deserialization() {
+        let json = r#"{"from_token": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48", "to_token": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2", "amount": "100"}"#;
+        let args: SwapTokensArgs = serde_json::from_str(json).unwrap();
+        assert_eq!(args.from_token, "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48");
+        assert_eq!(args.to_token, "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2");
+        assert_eq!(args.amount, "100");
+        assert_eq!(args.slippage, "0.5");
+    }
+
+    #[test]
+    fn test_swap_tokens_args_with_custom_slippage() {
+        let json = r#"{"from_token": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48", "to_token": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2", "amount": "100", "slippage": "1.5"}"#;
+        let args: SwapTokensArgs = serde_json::from_str(json).unwrap();
+        assert_eq!(args.slippage, "1.5");
+    }
+
+    #[test]
+    fn test_address_parsing() {
+        let valid_address = "0x742d35Cc6634C0532925a3b844Bc454e4438f44e";
+        let addr = Address::from_str(valid_address);
+        assert!(addr.is_ok());
+    }
+
+    #[test]
+    fn test_invalid_address_parsing() {
+        let invalid_address = "invalid_address";
+        let addr = Address::from_str(invalid_address);
+        assert!(addr.is_err());
+    }
+
+    #[test]
+    fn test_decimal_conversion() {
+        let value = "1000000000000000000";
+        let decimal = Decimal::from_str(value).unwrap();
+        let eth = decimal / Decimal::from_str("1000000000000000000").unwrap();
+        assert_eq!(eth.to_string(), "1");
+    }
+
+    #[test]
+    fn test_u256_arithmetic() {
+        let amount = U256::from(1000u128);
+        let divisor = U256::from(10u128);
+        let result = amount / divisor;
+        assert_eq!(result, U256::from(100u128));
+    }
+
+    #[test]
+    fn test_server_info() {
+        let trader = EthTrader::new();
+        let info = trader.get_info();
+        assert_eq!(info.protocol_version, ProtocolVersion::V_2024_11_05);
+        assert!(info.capabilities.tools.is_some());
+        assert!(info.instructions.is_some());
+    }
+
+    #[tokio::test]
+    async fn test_get_provider() {
+        let trader = EthTrader::new();
+        let provider = trader.get_provider().await;
+        assert!(provider.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_get_provider_with_invalid_url() {
+        let mut trader = EthTrader::new();
+        trader.rpc_url = "not a valid url".to_string();
+        let provider = trader.get_provider().await;
+        assert!(provider.is_err());
+    }
+
+    #[test]
+    fn test_parse_ether() {
+        let result = parse_ether("1");
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), U256::from_str("1000000000000000000").unwrap());
+    }
+
+    #[test]
+    fn test_known_addresses() {
+        let weth = Address::from_str("0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2");
+        assert!(weth.is_ok());
+
+        let usdc = Address::from_str("0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48");
+        assert!(usdc.is_ok());
+
+        let router = Address::from_str("0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D");
+        assert!(router.is_ok());
+    }
+
+    #[test]
+    fn test_slippage_calculation() {
+        let slippage = Decimal::from_str("0.5").unwrap();
+        let amount = U256::from(10000u128);
+        let slippage_percent = (slippage * Decimal::from(100)).to_u64().unwrap();
+        let min_out = amount * U256::from((10000 - slippage_percent) as u128) / U256::from(10000u128);
+        assert_eq!(min_out, U256::from(9950u128));
+    }
+}
