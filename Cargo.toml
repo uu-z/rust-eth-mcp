@@ -45,6 +45,10 @@ tower-http = { version = "0.6", features = ["cors"] }
 hyper = { version = "1" }
 hyper-util = { version = "0", features = ["server"] }
 tokio-util = { version = "0.7" }
+alloy = { version = "0.8", features = ["full", "node-bindings", "rpc-types-eth", "signer-local"] }
+rust_decimal = "1.36"
+rust_decimal_macros = "1.36"
+hex = "0.4"
 
 [dev-dependencies]
 tokio-stream = { version = "0.1" }
