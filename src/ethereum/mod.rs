@@ -441,4 +441,270 @@ mod tests {
         let min_out = amount * U256::from((10000 - slippage_percent) as u128) / U256::from(10000u128);
         assert_eq!(min_out, U256::from(9950u128));
     }
+
+    // E2E Tests - require network connection
+    #[tokio::test]
+    async fn test_e2e_get_balance_eth() {
+        let trader = EthTrader::new();
+
+        // Vitalik's address - known to have ETH
+        let args = GetBalanceArgs {
+            address: "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045".to_string(),
+            token: None,
+        };
+
+        let result = trader.get_balance(Parameters(args)).await;
+        assert!(result.is_ok());
+
+        let call_result = result.unwrap();
+        assert!(call_result.is_error.is_none() || !call_result.is_error.unwrap());
+        assert!(!call_result.content.is_empty());
+
+        let content_text = &call_result.content[0];
+        if let Some(text_content) = content_text.as_text() {
+            let json: serde_json::Value = serde_json::from_str(&text_content.text).unwrap();
+            assert_eq!(json["address"], "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045");
+            assert_eq!(json["symbol"], "ETH");
+            assert!(json["balance"].as_str().is_some());
+            assert!(json["raw_balance"].as_str().is_some());
+        } else {
+            panic!("Expected Text content");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_e2e_get_balance_erc20() {
+        let trader = EthTrader::new();
+
+        // Binance hot wallet - known to have USDC
+        let args = GetBalanceArgs {
+            address: "0x28C6c06298d514Db089934071355E5743bf21d60".to_string(),
+            token: Some("0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48".to_string()), // USDC
+        };
+
+        let result = trader.get_balance(Parameters(args)).await;
+        assert!(result.is_ok());
+
+        let call_result = result.unwrap();
+        assert!(call_result.is_error.is_none() || !call_result.is_error.unwrap());
+        assert!(!call_result.content.is_empty());
+
+        let content_text = &call_result.content[0];
+        if let Some(text_content) = content_text.as_text() {
+            let json: serde_json::Value = serde_json::from_str(&text_content.text).unwrap();
+            assert_eq!(json["address"], "0x28C6c06298d514Db089934071355E5743bf21d60");
+            assert_eq!(json["token"], "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48");
+            assert_eq!(json["symbol"], "USDC");
+            assert_eq!(json["decimals"], 6);
+            assert!(json["balance"].as_str().is_some());
+            assert!(json["raw_balance"].as_str().is_some());
+        } else {
+            panic!("Expected Text content");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_e2e_get_balance_invalid_address() {
+        let trader = EthTrader::new();
+
+        let args = GetBalanceArgs {
+            address: "invalid_address".to_string(),
+            token: None,
+        };
+
+        let result = trader.get_balance(Parameters(args)).await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_e2e_get_token_price_usd() {
+        let trader = EthTrader::new();
+
+        // Get DAI price in USD
+        // Note: Using DAI (18-decimal token) because the current implementation
+        // uses parse_ether("1") which is appropriate for 18-decimal tokens
+        let args = GetTokenPriceArgs {
+            token: "0x6B175474E89094C44Da98b954EedeAC495271d0F".to_string(), // DAI
+            quote: "USD".to_string(),
+        };
+
+        let result = trader.get_token_price(Parameters(args)).await;
+        if result.is_err() {
+            eprintln!("Error getting DAI price: {:?}", result.as_ref().err());
+        }
+        assert!(result.is_ok());
+
+        let call_result = result.unwrap();
+        assert!(call_result.is_error.is_none() || !call_result.is_error.unwrap());
+        assert!(!call_result.content.is_empty());
+
+        let content_text = &call_result.content[0];
+        if let Some(text_content) = content_text.as_text() {
+            let json: serde_json::Value = serde_json::from_str(&text_content.text).unwrap();
+            assert_eq!(json["token"], "0x6B175474E89094C44Da98b954EedeAC495271d0F");
+            assert_eq!(json["quote"], "USD");
+            assert!(json["price"].as_str().is_some());
+
+            // DAI price should be roughly $1 (between $0.90 and $1.10)
+            let price = Decimal::from_str(json["price"].as_str().unwrap()).unwrap();
+            eprintln!("DAI price in USD: {}", price);
+            assert!(price > Decimal::new(90, 2)); // > 0.90
+            assert!(price < Decimal::new(110, 2)); // < 1.10
+        } else {
+            panic!("Expected Text content");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_e2e_get_token_price_eth() {
+        let trader = EthTrader::new();
+
+        // Get DAI price in ETH
+        // Using DAI (another 18-decimal token) since WETH->WETH would fail
+        let args = GetTokenPriceArgs {
+            token: "0x6B175474E89094C44Da98b954EedeAC495271d0F".to_string(), // DAI
+            quote: "ETH".to_string(),
+        };
+
+        let result = trader.get_token_price(Parameters(args)).await;
+        assert!(result.is_ok());
+
+        let call_result = result.unwrap();
+        assert!(call_result.is_error.is_none() || !call_result.is_error.unwrap());
+        assert!(!call_result.content.is_empty());
+
+        let content_text = &call_result.content[0];
+        if let Some(text_content) = content_text.as_text() {
+            let json: serde_json::Value = serde_json::from_str(&text_content.text).unwrap();
+            assert_eq!(json["token"], "0x6B175474E89094C44Da98b954EedeAC495271d0F");
+            assert_eq!(json["quote"], "ETH");
+            assert!(json["price"].as_str().is_some());
+
+            // DAI price in ETH should be reasonable (1 DAI ~ $1, so should be very small fraction of ETH)
+            let price = Decimal::from_str(json["price"].as_str().unwrap()).unwrap();
+            eprintln!("DAI price in ETH: {}", price);
+            assert!(price > Decimal::ZERO);
+            assert!(price < Decimal::from(1)); // Should be less than 1 ETH
+        } else {
+            panic!("Expected Text content");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_e2e_get_token_price_invalid_token() {
+        let trader = EthTrader::new();
+
+        let args = GetTokenPriceArgs {
+            token: "invalid_token_address".to_string(),
+            quote: "USD".to_string(),
+        };
+
+        let result = trader.get_token_price(Parameters(args)).await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_e2e_swap_tokens_usdc_to_weth() {
+        let trader = EthTrader::new();
+
+        // Simulate swapping 1000 USDC to WETH
+        let args = SwapTokensArgs {
+            from_token: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48".to_string(), // USDC
+            to_token: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2".to_string(), // WETH
+            amount: "1000".to_string(),
+            slippage: "0.5".to_string(),
+        };
+
+        let result = trader.swap_tokens(Parameters(args)).await;
+        assert!(result.is_ok());
+
+        let call_result = result.unwrap();
+        assert!(call_result.is_error.is_none() || !call_result.is_error.unwrap());
+        assert!(!call_result.content.is_empty());
+
+        let content_text = &call_result.content[0];
+        if let Some(text_content) = content_text.as_text() {
+            let json: serde_json::Value = serde_json::from_str(&text_content.text).unwrap();
+            assert_eq!(json["simulation"], "success");
+            assert_eq!(json["from_token"], "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48");
+            assert_eq!(json["to_token"], "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2");
+            assert_eq!(json["amount_in"], "1000");
+            assert_eq!(json["slippage"], "0.5%");
+            assert!(json["estimated_output"].as_str().is_some());
+            assert!(json["minimum_output"].as_str().is_some());
+            assert!(json["gas_estimate"].as_str().is_some());
+            assert!(json["gas_cost_eth"].as_str().is_some());
+            assert!(json["note"].as_str().unwrap().contains("simulation"));
+
+            // The estimated output should be reasonable (1000 USDC should be > 0.1 ETH)
+            let estimated_output = Decimal::from_str(json["estimated_output"].as_str().unwrap()).unwrap();
+            assert!(estimated_output > Decimal::new(1, 1)); // > 0.1 ETH
+        } else {
+            panic!("Expected Text content");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_e2e_swap_tokens_with_custom_slippage() {
+        let trader = EthTrader::new();
+
+        // Simulate swapping with 1.5% slippage
+        let args = SwapTokensArgs {
+            from_token: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48".to_string(), // USDC
+            to_token: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2".to_string(), // WETH
+            amount: "100".to_string(),
+            slippage: "1.5".to_string(),
+        };
+
+        let result = trader.swap_tokens(Parameters(args)).await;
+        assert!(result.is_ok());
+
+        let call_result = result.unwrap();
+        assert!(call_result.is_error.is_none() || !call_result.is_error.unwrap());
+
+        let content_text = &call_result.content[0];
+        if let Some(text_content) = content_text.as_text() {
+            let json: serde_json::Value = serde_json::from_str(&text_content.text).unwrap();
+            assert_eq!(json["slippage"], "1.5%");
+
+            // Verify that minimum_output is less than estimated_output by roughly 1.5%
+            let estimated = Decimal::from_str(json["estimated_output"].as_str().unwrap()).unwrap();
+            let minimum = Decimal::from_str(json["minimum_output"].as_str().unwrap()).unwrap();
+            let diff_percent = ((estimated - minimum) / estimated) * Decimal::from(100);
+            assert!(diff_percent > Decimal::new(14, 1)); // > 1.4%
+            assert!(diff_percent < Decimal::new(16, 1)); // < 1.6%
+        } else {
+            panic!("Expected Text content");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_e2e_swap_tokens_invalid_amount() {
+        let trader = EthTrader::new();
+
+        let args = SwapTokensArgs {
+            from_token: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48".to_string(),
+            to_token: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2".to_string(),
+            amount: "invalid_amount".to_string(),
+            slippage: "0.5".to_string(),
+        };
+
+        let result = trader.swap_tokens(Parameters(args)).await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_e2e_swap_tokens_invalid_from_token() {
+        let trader = EthTrader::new();
+
+        let args = SwapTokensArgs {
+            from_token: "invalid_address".to_string(),
+            to_token: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2".to_string(),
+            amount: "100".to_string(),
+            slippage: "0.5".to_string(),
+        };
+
+        let result = trader.swap_tokens(Parameters(args)).await;
+        assert!(result.is_err());
+    }
 }
