@@ -26,23 +26,27 @@ A Model Context Protocol (MCP) server built in Rust that enables AI agents to qu
 ### Installation
 
 1. Clone the repository:
+
 ```bash
-git clone <your-repo-url>
-cd rust-mcp7
+git clone https://github.com/uu-z/rust-eth-mcp
+cd rust-eth-mcp
 ```
 
 2. Set up environment variables:
+
 ```bash
 cp .env.example .env
 # Edit .env with your RPC URL (optional, defaults to public endpoint)
 ```
 
 3. Build the project:
+
 ```bash
 cargo build --release
 ```
 
 4. Run the server:
+
 ```bash
 cargo run --release
 ```
@@ -62,6 +66,7 @@ The server will start on `http://127.0.0.1:8000/mcp`
 #### 1. Get ETH Balance
 
 **Request:**
+
 ```json
 {
   "jsonrpc": "2.0",
@@ -77,6 +82,7 @@ The server will start on `http://127.0.0.1:8000/mcp`
 ```
 
 **Response:**
+
 ```json
 {
   "jsonrpc": "2.0",
@@ -96,6 +102,7 @@ The server will start on `http://127.0.0.1:8000/mcp`
 #### 2. Get ERC20 Token Balance
 
 **Request:**
+
 ```json
 {
   "jsonrpc": "2.0",
@@ -112,6 +119,7 @@ The server will start on `http://127.0.0.1:8000/mcp`
 ```
 
 **Response:**
+
 ```json
 {
   "jsonrpc": "2.0",
@@ -131,6 +139,7 @@ The server will start on `http://127.0.0.1:8000/mcp`
 #### 3. Get Token Price
 
 **Request:**
+
 ```json
 {
   "jsonrpc": "2.0",
@@ -147,6 +156,7 @@ The server will start on `http://127.0.0.1:8000/mcp`
 ```
 
 **Response:**
+
 ```json
 {
   "jsonrpc": "2.0",
@@ -166,6 +176,7 @@ The server will start on `http://127.0.0.1:8000/mcp`
 #### 4. Simulate Token Swap
 
 **Request:**
+
 ```json
 {
   "jsonrpc": "2.0",
@@ -184,6 +195,7 @@ The server will start on `http://127.0.0.1:8000/mcp`
 ```
 
 **Response:**
+
 ```json
 {
   "jsonrpc": "2.0",
@@ -223,6 +235,7 @@ The server will start on `http://127.0.0.1:8000/mcp`
 ## Testing
 
 Run tests:
+
 ```bash
 cargo test
 ```
@@ -246,6 +259,7 @@ MIT
 ## Contributing
 
 Pull requests welcome. Please ensure:
+
 - Code compiles with `cargo build`
 - Tests pass with `cargo test`
 - New features include documentation
